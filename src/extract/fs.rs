@@ -50,7 +50,7 @@ pub async fn unzip(zip_file: &str, dir: &str) -> anyhow::Result<()> {
 
         // Extract the file.
         let mut outfile = std::fs::File::create(&outpath).expect("creation of output file");
-        trace!("copying {} to {}", file.name(), outpath);
+        trace!("extracting {} to {}", file.name(), outpath);
         std::io::copy(&mut file, &mut outfile).expect("copying of zip file to output");
     });
 
