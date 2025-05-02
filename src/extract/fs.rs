@@ -4,10 +4,10 @@ use tracing::{debug, error, trace};
 
 /// Reads a `.json` file from `path`.
 pub async fn read_json<T: serde::de::DeserializeOwned>(path: &str) -> anyhow::Result<T> {
-    trace!("reading file at path {path}");
+    trace!(filepath=%path, "reading file");
     let file = tokio::fs::read(path).await?;
 
-    trace!("file read - deserializing bytes ...");
+    trace!(filepath=%path, "file read - deserializing bytes");
     let data: T = serde_json::from_slice(&file)?;
     Ok(data)
 }

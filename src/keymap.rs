@@ -51,7 +51,7 @@ where
     /// Retrieve a KeyMap from a PostgreSQL query.
     pub async fn pg_fetch(pg_pool: &Pool, stmt: &str) -> Result<Self> {
         let pg_client = pg_pool.get().await?;
-        
+
         //retrieve a BiMap from a pg query
         let bimap: BiMap<PK, Obj> = pg_client
             .query(stmt, &[])
@@ -77,27 +77,22 @@ where
     /// Insert a KeyMap into a PostgreSQL table, synchronously.
     pub async fn pg_insert(&self, pg_pool: &Pool, stmt: &str) -> Result<()> {
         let mut pg_client = pg_pool.get().await?;
-        
-        let query = pg_client
-            .prepare(stmt)
-            .await.map_err(|e| {
-                tracing::error!("Failed to prepare {stmt:?}: {e}");
-                e
-            })?;
 
-        let tx = pg_client
-            .transaction()
-            .await.map_err(|e| {
-                tracing::error!("Failed to open a transaction: {e}");
-                e
-            })?;
+        let query = pg_client.prepare(stmt).await.map_err(|e| {
+            tracing::error!("Failed to prepare {stmt:?}: {e}");
+            e
+        })?;
+
+        let tx = pg_client.transaction().await.map_err(|e| {
+            tracing::error!("Failed to open a transaction: {e}");
+            e
+        })?;
 
         for (key, value) in self.bimap.iter() {
-            tx.execute(&query, &[&key, &value])
-                .await.map_err(|e| {
-                    tracing::error!("Failed to execute {query:?}: {e}");
-                    e
-                })?;
+            tx.execute(&query, &[&key, &value]).await.map_err(|e| {
+                tracing::error!("Failed to execute {query:?}: {e}");
+                e
+            })?;
         }
 
         tx.commit().await.map_err(|e| {

@@ -20,8 +20,8 @@ pub trait PgLoadExt {
     /// data (or any other failing circumstances) must be dealt with prior to the use of the `copy()` function.
     async fn copy<'a, I, T>(&self, stmt: &'a str, collection: I) -> Result<()>
     where
-        I: SqlTypes + Iterator<Item = T> + Send + Sync,
-        T: SqlMap + Send + Sync;
+        I: Iterator<Item = T> + Send + Sync,
+        T: SqlTypes + SqlMap + Send + Sync;
 }
 
 /// Provide a SQL mapping for the item struct.
@@ -35,7 +35,7 @@ pub trait SqlMap {
 ///
 /// See [`postgres_types::types::ToSql`] for more detail.
 pub trait SqlTypes {
-    fn sql_types(&self) -> &[Type];
+    fn sql_types() -> &'static [Type];
 }
 
 #[async_trait]
@@ -59,12 +59,13 @@ impl PgLoadExt for &deadpool_postgres::Pool {
             let tx = &tx;
             async move {
                 match tx.execute(stmt, &item.sql_map()).await {
-                    Ok(_) => trace!("{stmt:?} executed successfully"),
+                    Ok(_) => {}
                     Err(e) => error!("Failed to insert {stmt:#?}: {e}"),
                 };
             }
             .await;
         }
+        trace!("{stmt:?} executed successfully");
 
         // Commit the transaction.
         tx.commit().await?;
@@ -76,24 +77,25 @@ impl PgLoadExt for &deadpool_postgres::Pool {
 
     async fn copy<'a, I, T>(&self, stmt: &'a str, collection: I) -> Result<()>
     where
-        I: SqlTypes + Iterator<Item = T> + Send + Sync,
-        T: SqlMap + Send + Sync,
+        I: Iterator<Item = T> + Send + Sync,
+        T: SqlTypes + SqlMap + Send + Sync,
     {
         // Get a client from the Pool.
         let mut pg_client = self.get().await?;
         let tx = pg_client.transaction().await?;
         let sink = tx.copy_in(stmt).await?;
-        let writer = BinaryCopyInWriter::new(sink, collection.sql_types());
+        let writer = BinaryCopyInWriter::new(sink, T::sql_types());
         futures::pin_mut!(writer); // writer must be pinned to use
 
-        // Loop the collection & write to the Binary Writer.
+        // Loop the collection & write to the `BinaryCopyInWriter`.
         // Possible async stream could go here, but copies are so quick this may be faster.
         for item in collection {
             match writer.as_mut().write(&item.sql_map()).await {
-                Ok(_) => trace!("{stmt:?} executed successfully"),
+                Ok(_) => {}
                 Err(e) => error!("Failed to copy {stmt:#?}: {e})"),
             }
         }
+        trace!("{stmt:?} executed successfully");
 
         // Commit the transaction.
         writer.finish().await?;
