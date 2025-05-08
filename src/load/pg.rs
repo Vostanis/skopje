@@ -31,6 +31,13 @@ pub trait SqlMap {
     fn sql_map(&self) -> Vec<&(dyn ToSql + Sync)>;
 }
 
+/// Auto implementation for all values that impl ToSql + Sync.
+impl<T: ToSql + Sync> SqlMap for &T {
+    fn sql_map(&self) -> Vec<&(dyn ToSql + Sync)> {
+        vec![self]
+    }
+}
+
 /// Provide the SQL types required.
 ///
 /// See [`postgres_types::types::ToSql`] for more detail.
@@ -57,13 +64,16 @@ impl PgLoadExt for &deadpool_postgres::Pool {
         while let Some(item) = stream.next().await {
             let stmt = &stmt;
             let tx = &tx;
-            async move {
-                match tx.execute(stmt, &item.sql_map()).await {
-                    Ok(_) => {}
-                    Err(e) => error!("Failed to insert {stmt:#?}: {e}"),
-                };
-            }
-            .await;
+            tx.execute(stmt, &item.sql_map()).await?;
+            // async move {
+            //     match tx.execute(stmt, &item.sql_map()).await {
+            //         Ok(_) => {}
+            //         Err(e) => return Err(e),
+            //     };
+
+            //     Ok::<(), anyhow::Error>(());
+            // }
+            // .await;
         }
         trace!("{stmt:?} executed successfully");
 

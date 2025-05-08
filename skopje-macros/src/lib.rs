@@ -1,75 +1,78 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    Data, DeriveInput, Fields, FieldsNamed,
-    parse::{Parse, ParseStream},
+    Data,
+    DeriveInput,
+    Fields,
+    FieldsNamed,
+    // parse::{Parse, ParseStream},
     parse_macro_input,
 };
 
-/// ```rust
-/// #[derive(Debug, serde::Deserialize)]
-/// #[skopje::extract(
-///     method = HTTP_GET,
-///     url = "https://api.binance.com/api/v1/ticker/allBookTickers",
-/// )]
-/// #[skopje::load(
-///     method = PG_INSERT,
-///     client = deadpool_postgres::Pool,
-///     obj = self.0
-/// )]
-/// pub struct Symbols(pub Vec<Symbol>);
-/// ```
-///
-/// Above is equivalent to:
-///
-/// ```rust
-/// #[derive(Debug, serde::Deserialize)]
-/// pub struct Symbols(pub Vec<Symbol>);
-///
-/// #[skopje::async_trait]
-/// impl skopje::etl::Extract for Symbols {
-///     type Client = skopje::HttpClient;
-///     async fn extract(client: Self::Client) -> Result<Self> {
-///         let url = "https://api.binance.com/api/v1/ticker/allBookTickers";
-///         let data: Self = client.fetch(url).await?;
-///         Ok(data)
-///     }
-/// }
-///
-/// #[skopje::async_trait]
-/// impl skopje::etl::Load for Symbols {
-///     type Client = skopje::PgPool;
-///     async fn load(&self, client: Self::Client) -> Result<()> {
-///         client
-///             .insert(super::common_sql::INSERT_SYMBOL, self.0.iter())
-///             .await?;
-///         Ok(())
-///     }
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn extract(item: TokenStream, attr: TokenStream) -> TokenStream {
-    let args = parse_macro_input!(attr as ExtractArgs);
-    quote! {}.into()
-}
+// /// ```rust
+// /// #[derive(Debug, serde::Deserialize)]
+// /// #[skopje::extract(
+// ///     method = HTTP_GET,
+// ///     url = "https://api.binance.com/api/v1/ticker/allBookTickers",
+// /// )]
+// /// #[skopje::load(
+// ///     method = PG_INSERT,
+// ///     client = deadpool_postgres::Pool,
+// ///     obj = self.0
+// /// )]
+// /// pub struct Symbols(pub Vec<Symbol>);
+// /// ```
+// ///
+// /// Above is equivalent to:
+// ///
+// /// ```rust
+// /// #[derive(Debug, serde::Deserialize)]
+// /// pub struct Symbols(pub Vec<Symbol>);
+// ///
+// /// #[skopje::async_trait]
+// /// impl skopje::etl::Extract for Symbols {
+// ///     type Client = skopje::HttpClient;
+// ///     async fn extract(client: Self::Client) -> Result<Self> {
+// ///         let url = "https://api.binance.com/api/v1/ticker/allBookTickers";
+// ///         let data: Self = client.fetch(url).await?;
+// ///         Ok(data)
+// ///     }
+// /// }
+// ///
+// /// #[skopje::async_trait]
+// /// impl skopje::etl::Load for Symbols {
+// ///     type Client = skopje::PgPool;
+// ///     async fn load(&self, client: Self::Client) -> Result<()> {
+// ///         client
+// ///             .insert(super::common_sql::INSERT_SYMBOL, self.0.iter())
+// ///             .await?;
+// ///         Ok(())
+// ///     }
+// /// }
+// /// ```
+// #[proc_macro_attribute]
+// pub fn extract(item: TokenStream, attr: TokenStream) -> TokenStream {
+//     let args = parse_macro_input!(attr as ExtractArgs);
+//     quote! {}.into()
+// }
 
-struct ExtractArgs<'a> {
-    method: Option<&'a str>,
-    url: Option<&'a str>,
-    path: Option<&'a str>,
-}
+// struct ExtractArgs<'a> {
+//     method: Option<&'a str>,
+//     url: Option<&'a str>,
+//     path: Option<&'a str>,
+// }
 
-impl Parse for ExtractArgs<'_> {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut output = Self {
-            method: None,
-            url: None,
-            path: None,
-        };
+// impl Parse for ExtractArgs<'_> {
+//     fn parse(input: ParseStream) -> syn::Result<Self> {
+//         let mut output = Self {
+//             method: None,
+//             url: None,
+//             path: None,
+//         };
 
-        Ok(output)
-    }
-}
+//         Ok(output)
+//     }
+// }
 
 /// Provide a like-for-like implementation of ['crate::load::pg::SqlMap`].
 /// Take the following:

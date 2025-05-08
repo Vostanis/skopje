@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 use anyhow::Result;
 use async_trait::async_trait;
 use bytesize::ByteSize;
@@ -6,7 +8,7 @@ use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::Mutex;
-use tracing::{debug, error, trace};
+use tracing::{debug, error, trace, warn};
 
 /// Size of each chunk when downloading; currently set to 100MB.
 const CHUNK_SIZE: u64 = 100 * 1024 * 1024; // 100 MegaBytes
@@ -32,7 +34,7 @@ pub trait HttpExtractExt {
 #[async_trait]
 impl HttpExtractExt for reqwest::Client {
     async fn fetch<T: DeserializeOwned>(&self, url: &str) -> Result<T> {
-        let data = get(self, url).await?;
+        let data = get_retry(self, url).await?;
         Ok(data)
     }
 
@@ -126,20 +128,59 @@ impl HttpExtractExt for reqwest::Client {
 ///
 /// This function mainly aims to standardize any error handling.
 pub async fn get<T: serde::de::DeserializeOwned>(client: &reqwest::Client, url: &str) -> Result<T> {
-    let data: T = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| {
+    let response = client.get(url).send().await.map_err(|e| {
+        error!(url = %url, "Failed to send GET request: {e}");
+        e
+    })?;
+
+    let response_status = response.status();
+    trace!("response code: {}", response_status);
+
+    let data: T = response.json().await.map_err(|e| {
+        error!(url = %url, response_status=%response_status, "Failed to deserialize JSON: {e}");
+        e
+    })?;
+
+    Ok(data)
+}
+
+/// Send a HTTP GET request, using a referenced [`reqweest::Client`] and a URL.
+///
+/// If a 429 Error Code is found in the response: wait 30 seconds and try again; repeat
+/// this 2 more times, and then timeout.
+///
+/// This function mainly aims to standardize any error handling.
+async fn get_retry<T>(client: &reqwest::Client, url: &str) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    const MAX_RETRIES: u32 = 3;
+    let mut attempt = 0;
+
+    loop {
+        attempt += 1;
+
+        let response = client.get(url).send().await.map_err(|e| {
             error!(url = %url, "Failed to send GET request: {e}");
-            e
-        })?
-        .json()
-        .await
-        .map_err(|e| {
-            error!(url = %url, "Failed to deserialize JSON: {e}");
             e
         })?;
 
-    Ok(data)
+        let response_status = response.status();
+        trace!("response code: {}", response_status);
+
+        if response_status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            if attempt <= MAX_RETRIES {
+                warn!(url = %url, attempt = attempt, "rate limited (429) - waiting 2 minutes before retry");
+                tokio::time::sleep(std::time::Duration::from_secs(120)).await;
+                continue;
+            }
+        }
+
+        let data: T = response.json().await.map_err(|e| {
+            error!(url = %url, response_status=%response_status, "Failed to deserialize JSON: {e}");
+            e
+        })?;
+
+        return Ok(data);
+    }
 }
