@@ -161,7 +161,7 @@ where
         attempt += 1;
 
         let response = client.get(url).send().await.map_err(|e| {
-            error!(url = %url, "Failed to send GET request: {e}");
+            error!(url = %url, "failed to send GET request: {e}");
             e
         })?;
 
@@ -177,7 +177,7 @@ where
         }
 
         let data: T = response.json().await.map_err(|e| {
-            error!(url = %url, response_status=%response_status, "Failed to deserialize JSON: {e}");
+            error!(url = %url, response_status=%response_status, "failed to deserialize JSON: {e}");
             e
         })?;
 
